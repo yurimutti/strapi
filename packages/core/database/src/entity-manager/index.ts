@@ -1,6 +1,4 @@
-'use strict';
-
-const {
+import {
   castArray,
   compact,
   difference,
@@ -23,34 +21,34 @@ const {
   pick,
   uniqBy,
   uniqWith,
-} = require('lodash/fp');
+} from 'lodash/fp';
 
-const { mapAsync } = require('@strapi/utils');
-const types = require('../types');
-const { createField } = require('../fields');
-const { createQueryBuilder } = require('../query');
-const { createRepository } = require('./entity-repository');
-const { deleteRelatedMorphOneRelationsAfterMorphToManyUpdate } = require('./morph-relations');
-const {
+import { mapAsync } from '@strapi/utils';
+import * as types from '../types';
+import { createField } from '../fields';
+import { createQueryBuilder } from '../query';
+import { createRepository } from './entity-repository';
+import { deleteRelatedMorphOneRelationsAfterMorphToManyUpdate } from './morph-relations';
+import {
   isPolymorphic,
   isBidirectional,
   isAnyToOne,
   isOneToAny,
   hasOrderColumn,
   hasInverseOrderColumn,
-} = require('../metadata/relations');
-const {
+} from '../metadata/relations';
+import {
   deletePreviousOneToAnyRelations,
   deletePreviousAnyToOneRelations,
   deleteRelations,
   cleanOrderColumns,
-} = require('./regular-relations');
-const { relationsOrderer } = require('./relations-orderer');
-const {
+} from './regular-relations';
+import { relationsOrderer } from './relations-orderer';
+import {
   replaceRegularRelations,
   cloneRegularRelations,
-} = require('./relations/cloning/regular-relations');
-const { DatabaseError } = require('../errors');
+} from './relations/cloning/regular-relations';
+import { DatabaseError } from '../errors';
 
 const toId = (value) => value.id || value;
 const toIds = (value) => castArray(value || []).map(toId);
@@ -179,7 +177,7 @@ const processData = (metadata, data = {}, { withDefaults = false } = {}) => {
   return obj;
 };
 
-const createEntityManager = (db) => {
+export const createEntityManager = (db) => {
   const repoMap = {};
 
   return {
@@ -1378,8 +1376,4 @@ const createEntityManager = (db) => {
       repoMap.clear();
     },
   };
-};
-
-module.exports = {
-  createEntityManager,
 };

@@ -1,9 +1,12 @@
-'use strict';
+import { isString } from 'lodash/fp';
+import { isAnyToMany } from '../metadata/relations';
+import type { Database } from '..';
 
-const { isString } = require('lodash/fp');
-const { isAnyToMany } = require('../metadata/relations');
+type Params = Record<string, unknown>;
+type Data = Record<string, unknown>;
+type ID = number | string;
 
-const withDefaultPagination = (params) => {
+const withDefaultPagination = (params: Params) => {
   const { page = 1, pageSize = 10, ...rest } = params;
 
   return {
@@ -13,7 +16,7 @@ const withDefaultPagination = (params) => {
   };
 };
 
-const withOffsetLimit = (params) => {
+const withOffsetLimit = (params: Params) => {
   const { page, pageSize, ...rest } = withDefaultPagination(params);
 
   const offset = Math.max(page - 1, 0) * pageSize;
@@ -25,27 +28,27 @@ const withOffsetLimit = (params) => {
     offset,
   };
 
-  return [query, { page, pageSize }];
+  return [query, { page, pageSize }] as const;
 };
 
-const createRepository = (uid, db) => {
+export const createRepository = (uid: string, db: Database) => {
   return {
-    findOne(params) {
+    findOne(params: Params) {
       return db.entityManager.findOne(uid, params);
     },
 
-    findMany(params) {
+    findMany(params: Params) {
       return db.entityManager.findMany(uid, params);
     },
 
-    findWithCount(params) {
+    findWithCount(params: Params) {
       return Promise.all([
         db.entityManager.findMany(uid, params),
         db.entityManager.count(uid, params),
       ]);
     },
 
-    async findPage(params) {
+    async findPage(params: Params) {
       const [query, { page, pageSize }] = withOffsetLimit(params);
 
       const [results, total] = await Promise.all([
@@ -64,70 +67,70 @@ const createRepository = (uid, db) => {
       };
     },
 
-    create(params) {
+    create(params: Params) {
       return db.entityManager.create(uid, params);
     },
 
-    createMany(params) {
+    createMany(params: Params) {
       return db.entityManager.createMany(uid, params);
     },
 
-    update(params) {
+    update(params: Params) {
       return db.entityManager.update(uid, params);
     },
 
-    updateMany(params) {
+    updateMany(params: Params) {
       return db.entityManager.updateMany(uid, params);
     },
 
-    clone(id, params) {
+    clone(id: ID, params: Params) {
       return db.entityManager.clone(uid, id, params);
     },
 
-    delete(params) {
+    delete(params: Params) {
       return db.entityManager.delete(uid, params);
     },
 
-    deleteMany(params) {
+    deleteMany(params: Params) {
       return db.entityManager.deleteMany(uid, params);
     },
 
-    count(params) {
+    count(params: Params) {
       return db.entityManager.count(uid, params);
     },
 
-    attachRelations(id, data) {
+    attachRelations(id: ID, data: Data) {
       return db.entityManager.attachRelations(uid, id, data);
     },
 
-    async updateRelations(id, data) {
+    async updateRelations(id: ID, data: Data) {
       const trx = await db.transaction();
       try {
-        await db.entityManager.updateRelations(uid, id, data, { transaction: trx.get() });
-        return trx.commit();
+        await db.entityManager.updateRelations(uid, id, data, { transaction: trx?.get() });
+        return await trx?.commit();
       } catch (e) {
-        await trx.rollback();
+        await trx?.rollback();
         throw e;
       }
     },
 
-    deleteRelations(id) {
+    deleteRelations(id: ID) {
       return db.entityManager.deleteRelations(uid, id);
     },
 
-    cloneRelations(targetId, sourceId, params) {
+    cloneRelations(targetId: ID, sourceId: ID, params: Params) {
       return db.entityManager.cloneRelations(uid, targetId, sourceId, params);
     },
 
-    populate(entity, populate) {
+    populate(entity: Data, populate: unknown) {
       return db.entityManager.populate(uid, entity, populate);
     },
 
-    load(entity, fields, params) {
+    load(entity: Data, fields: string[], params: Params) {
       return db.entityManager.load(uid, entity, fields, params);
     },
 
-    async loadPages(entity, field, params) {
+    async loadPages(entity: Data, field: string[], params: Params) {
       if (!isString(field)) {
         throw new Error(`Invalid load. Expected ${field} to be a string`);
       }
@@ -157,8 +160,4 @@ const createRepository = (uid, db) => {
       };
     },
   };
-};
-
-module.exports = {
-  createRepository,
 };

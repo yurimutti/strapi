@@ -82,7 +82,7 @@ class Database {
     return !!transactionCtx.get();
   }
 
-  async transaction(cb) {
+  async transaction(cb?: unknown) {
     const notNestedTransaction = !transactionCtx.get();
     const trx = notNestedTransaction ? await this.connection.transaction() : transactionCtx.get();
 
