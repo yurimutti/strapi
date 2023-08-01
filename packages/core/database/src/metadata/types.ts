@@ -7,7 +7,7 @@ export interface ColumnInfo {
 
 export interface Attribute {
   type: string;
-  columnName?: string;
+  columnName: string;
   column?: ColumnInfo;
   required?: boolean;
   unique?: boolean;
@@ -26,16 +26,14 @@ export interface JoinColumn {
   referencedTable?: string;
 }
 
-export interface JoinTable {
+export interface AttributeJoinTable {
   name: string;
   joinColumn: JoinColumn;
   orderBy?: Record<string, 'asc' | 'desc'>;
+  on?: Record<string, unknown>;
   orderColumnName?: string;
   inverseOrderColumnName?: string;
   pivotColumns: string[];
-}
-
-export interface AttributeJoinTable extends JoinTable {
   inverseJoinColumn: {
     name: string;
     referencedColumn: string;
@@ -52,13 +50,19 @@ export interface MorphColumn {
   };
 }
 
-export interface MorphJoinTable extends JoinTable {
+export interface MorphJoinTable {
+  name: string;
+  joinColumn: JoinColumn;
+  orderBy?: Record<string, 'asc' | 'desc'>;
+  orderColumnName?: string;
+  inverseOrderColumnName?: string;
+  pivotColumns: string[];
   morphColumn: MorphColumn;
-  inverseJoinColumn?: never;
 }
 
 export interface BidirectionalRelationalAttribute extends RelationalAttribute {
   inversedBy: string;
+  joinTable: AttributeJoinTable;
 }
 
 export interface RelationalAttribute extends Attribute {
@@ -81,7 +85,7 @@ export interface Meta {
   indexes: Index[];
   foreignKeys?: ForeignKey[];
   lifecycles?: Record<string, unknown>;
-  columnToAttribute?: Record<string, string>;
+  columnToAttribute: Record<string, string>;
   componentLink?: Meta;
 }
 

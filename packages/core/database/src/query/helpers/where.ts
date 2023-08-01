@@ -1,15 +1,18 @@
-'use strict';
+import { isArray, castArray, keys, isPlainObject } from 'lodash/fp';
 
-const { isArray, castArray, keys, isPlainObject } = require('lodash/fp');
+import { isOperatorOfType } from '@strapi/utils';
+import * as types from '../../types';
+import { createField } from '../../fields';
+import { createJoin } from './join';
+import { toColumnName } from './transform';
+import { isKnexQuery } from '../../utils/knex';
 
-const { isOperatorOfType } = require('@strapi/utils');
-const types = require('../../types');
-const { createField } = require('../../fields');
-const { createJoin } = require('./join');
-const { toColumnName } = require('./transform');
-const { isKnexQuery } = require('../../utils/knex');
+import type { Attribute } from '../../metadata/types';
+import type { Ctx } from '../types';
 
-const castValue = (value, attribute) => {
+const isObj = (value: unknown): value is Record<string, unknown> => isPlainObject(value);
+
+const castValue = (value: unknown, attribute: Attribute | null) => {
   if (!attribute) {
     return value;
   }
@@ -23,12 +26,12 @@ const castValue = (value, attribute) => {
   return value;
 };
 
-const processAttributeWhere = (attribute, where, operator = '$eq') => {
-  if (isArray(where)) {
-    return where.map((sub) => processAttributeWhere(attribute, sub, operator));
-  }
-
-  if (!isPlainObject(where)) {
+const processSingleAttributeWhere = (
+  attribute: Attribute | null,
+  where: unknown,
+  operator = '$eq'
+) => {
+  if (!isObj(where)) {
     if (isOperatorOfType('cast', operator)) {
       return castValue(where, attribute);
     }
@@ -36,7 +39,7 @@ const processAttributeWhere = (attribute, where, operator = '$eq') => {
     return where;
   }
 
-  const filters = {};
+  const filters: Record<string, unknown> = {};
 
   for (const key of Object.keys(where)) {
     const value = where[key];
@@ -51,15 +54,29 @@ const processAttributeWhere = (attribute, where, operator = '$eq') => {
   return filters;
 };
 
+const processAttributeWhere = (attribute: Attribute | null, where: unknown, operator = '$eq') => {
+  if (isArray(where)) {
+    return where.map((sub) => processSingleAttributeWhere(attribute, sub, operator));
+  }
+
+  return processSingleAttributeWhere(attribute, where, operator);
+};
+
+const processNested = (where: unknown, ctx: WhereCtx) => {
+  if (!isObj(where)) {
+    return where;
+  }
+
+  return processWhere(where, ctx);
+};
+
+type WhereCtx = Ctx & { alias?: string };
+
 /**
  * Process where parameter
- * @param {Object} where
- * @param {Object} ctx
- * @param {number} depth
- * @returns {Object}
  */
-const processWhere = (where, ctx) => {
-  if (!isArray(where) && !isPlainObject(where)) {
+const processWhere = (where: unknown, ctx: WhereCtx): unknown => {
+  if (!isArray(where) && !isObj(where)) {
     throw new Error('Where must be an array or an object');
   }
 
@@ -67,25 +84,17 @@ const processWhere = (where, ctx) => {
     return where.map((sub) => processWhere(sub, ctx));
   }
 
-  const processNested = (where, ctx) => {
-    if (!isPlainObject(where)) {
-      return where;
-    }
-
-    return processWhere(where, ctx);
-  };
-
   const { db, uid, qb, alias } = ctx;
   const meta = db.metadata.get(uid);
 
-  const filters = {};
+  const filters: Record<string, unknown> = {};
 
   // for each key in where
   for (const key of Object.keys(where)) {
     const value = where[key];
 
     // if operator $and $or then loop over them
-    if (isOperatorOfType('group', key)) {
+    if (isOperatorOfType('group', key) && Array.isArray(value)) {
       filters[key] = value.map((sub) => processNested(sub, ctx));
       continue;
     }
@@ -124,7 +133,7 @@ const processWhere = (where, ctx) => {
         uid: attribute.target,
       });
 
-      if (!isPlainObject(nestedWhere) || isOperatorOfType('where', keys(nestedWhere)[0])) {
+      if (!isObj(nestedWhere) || isOperatorOfType('where', keys(nestedWhere)[0])) {
         nestedWhere = { [qb.aliasColumn('id', subAlias)]: nestedWhere };
       }
 
@@ -303,7 +312,7 @@ const applyOperator = (qb, column, operator, value) => {
 };
 
 const applyWhereToColumn = (qb, column, columnWhere) => {
-  if (!isPlainObject(columnWhere)) {
+  if (!isObj(columnWhere)) {
     if (Array.isArray(columnWhere)) {
       return qb.whereIn(column, columnWhere);
     }
@@ -319,7 +328,7 @@ const applyWhereToColumn = (qb, column, columnWhere) => {
 };
 
 const applyWhere = (qb, where) => {
-  if (!isArray(where) && !isPlainObject(where)) {
+  if (!isArray(where) && !isObj(where)) {
     throw new Error('Where must be an array or an object');
   }
 
@@ -359,7 +368,4 @@ const fieldLowerFn = (qb) => {
   return 'LOWER(??)';
 };
 
-module.exports = {
-  applyWhere,
-  processWhere,
-};
+export { applyWhere, processWhere };

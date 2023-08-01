@@ -1,8 +1,6 @@
-'use strict';
+import _ from 'lodash/fp';
 
-const _ = require('lodash/fp');
-
-const types = require('../../../types');
+import * as types from '../../../types';
 
 const getRootLevelPopulate = (meta) => {
   const populate = {};
@@ -99,4 +97,4 @@ const processPopulate = (populate, ctx) => {
   return finalPopulate;
 };
 
-module.exports = processPopulate;
+export default processPopulate;

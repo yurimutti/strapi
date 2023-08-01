@@ -1,12 +1,16 @@
-'use strict';
+import _ from 'lodash/fp';
 
-const _ = require('lodash/fp');
+import * as types from '../../types';
+import { createJoin } from './join';
+import { toColumnName } from './transform';
 
-const types = require('../../types');
-const { createJoin } = require('./join');
-const { toColumnName } = require('./transform');
+import type { Ctx } from '../types';
 
-const processOrderBy = (orderBy, ctx) => {
+type OrderByCtx = Ctx & { alias?: string };
+type OrderBy = string | { [key: string]: 'asc' | 'desc' } | OrderBy[];
+type OrderByValue = { column: unknown; order?: 'asc' | 'desc' };
+
+export const processOrderBy = (orderBy: OrderBy, ctx: OrderByCtx): OrderByValue[] => {
   const { db, uid, qb, alias } = ctx;
   const meta = db.metadata.get(uid);
   const { attributes } = meta;
@@ -45,7 +49,6 @@ const processOrderBy = (orderBy, ctx) => {
       if (attribute.type === 'relation') {
         const subAlias = createJoin(ctx, {
           alias: alias || qb.alias,
-          uid,
           attributeName: key,
           attribute,
         });
@@ -63,8 +66,4 @@ const processOrderBy = (orderBy, ctx) => {
   }
 
   throw new Error('Invalid orderBy syntax');
-};
-
-module.exports = {
-  processOrderBy,
 };

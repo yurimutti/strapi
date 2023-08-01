@@ -1,6 +1,7 @@
-'use strict';
+import type { Knex } from 'knex';
 
-const { cleanInverseOrderColumn } = require('../../regular-relations');
+import { cleanInverseOrderColumn } from '../../regular-relations';
+import type { BidirectionalRelationalAttribute } from '../../../metadata/types';
 
 const replaceRegularRelations = async ({
   targetId,
@@ -8,8 +9,15 @@ const replaceRegularRelations = async ({
   attribute,
   omitIds,
   transaction: trx,
+}: {
+  targetId: string;
+  sourceId: string;
+  attribute: BidirectionalRelationalAttribute;
+  omitIds: string[];
+  transaction: Knex.Transaction;
 }) => {
   const { joinTable } = attribute;
+
   const { joinColumn, inverseJoinColumn } = joinTable;
 
   // We are effectively stealing the relation from the cloned entity
@@ -24,16 +32,34 @@ const replaceRegularRelations = async ({
     .execute();
 };
 
-const cloneRegularRelations = async ({ targetId, sourceId, attribute, transaction: trx }) => {
+const cloneRegularRelations = async ({
+  targetId,
+  sourceId,
+  attribute,
+  transaction: trx,
+}: {
+  targetId: string;
+  sourceId: string;
+  attribute: BidirectionalRelationalAttribute;
+  transaction: Knex.Transaction;
+}) => {
   const { joinTable } = attribute;
   const { joinColumn, inverseJoinColumn, orderColumnName, inverseOrderColumnName } = joinTable;
   const connection = strapi.db.getConnection();
 
   // Get the columns to select
   const columns = [joinColumn.name, inverseJoinColumn.name];
-  if (orderColumnName) columns.push(orderColumnName);
-  if (inverseOrderColumnName) columns.push(inverseOrderColumnName);
-  if (joinTable.on) columns.push(...Object.keys(joinTable.on));
+  if (orderColumnName) {
+    columns.push(orderColumnName);
+  }
+
+  if (inverseOrderColumnName) {
+    columns.push(inverseOrderColumnName);
+  }
+
+  if (joinTable.on) {
+    columns.push(...Object.keys(joinTable.on));
+  }
 
   const selectStatement = connection
     .select(
@@ -70,7 +96,4 @@ const cloneRegularRelations = async ({ targetId, sourceId, attribute, transactio
   }
 };
 
-module.exports = {
-  replaceRegularRelations,
-  cloneRegularRelations,
-};
+export { replaceRegularRelations, cloneRegularRelations };

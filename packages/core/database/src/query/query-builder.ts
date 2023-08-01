@@ -1,16 +1,94 @@
-'use strict';
+import _ from 'lodash/fp';
+import type { Knex } from 'knex';
 
-const _ = require('lodash/fp');
-
-const { DatabaseError } = require('../errors');
-const helpers = require('./helpers');
+import { DatabaseError } from '../errors';
+import * as helpers from './helpers';
 import { transactionCtx } from '../transaction-context';
 
-const createQueryBuilder = (uid, db, initialState = {}) => {
+import type { Database } from '..';
+
+interface State {
+  type: 'select' | 'insert' | 'update' | 'delete' | 'count' | 'max' | 'truncate';
+  select: string[];
+  count: string | null;
+  max: string | null;
+  first: boolean;
+  data: object | null;
+  where: object[];
+  joins: object[];
+  populate: object | null;
+  limit: number | null;
+  offset: number | null;
+  transaction: any;
+  forUpdate: boolean;
+  onConflict: any;
+  merge: any;
+  ignore: boolean;
+  orderBy: any[];
+  groupBy: any[];
+  increments: any[];
+  decrements: any[];
+  aliasCounter: number;
+  filters: any;
+  search: string;
+}
+
+export interface QueryBuilder {
+  alias: string;
+  state: State;
+  getAlias(): string;
+  clone(): QueryBuilder;
+  select(args: string | string[]): QueryBuilder;
+  addSelect(args: string | string[]): QueryBuilder;
+  insert<T extends object>(data: T): QueryBuilder;
+  onConflict(args: any): QueryBuilder;
+  merge(args: any): QueryBuilder;
+  ignore(): QueryBuilder;
+  delete(): QueryBuilder;
+  ref(name: string): any;
+  update<T extends object>(data: T): QueryBuilder;
+  increment(column: string, amount?: number): QueryBuilder;
+  decrement(column: string, amount?: number): QueryBuilder;
+  count(count?: string): QueryBuilder;
+  max(column: string): QueryBuilder;
+  where(where?: object): QueryBuilder;
+  limit(limit: number): QueryBuilder;
+  offset(offset: number): QueryBuilder;
+  orderBy(orderBy: any): QueryBuilder;
+  groupBy(groupBy: any): QueryBuilder;
+  populate(populate: any): QueryBuilder;
+  search(query: string): QueryBuilder;
+  transacting(transaction: any): QueryBuilder;
+  forUpdate(): QueryBuilder;
+  init(params?: any): QueryBuilder;
+  filters(filters: any): void;
+  first(): QueryBuilder;
+  join(join: any): QueryBuilder;
+  mustUseAlias(): boolean;
+
+  aliasColumn(key: string, alias?: string): string;
+  aliasColumn(key: unknown, alias?: string): unknown;
+
+  raw: Knex.RawBuilder;
+  shouldUseSubQuery(): boolean;
+  runSubQuery(): any;
+  processState(): void;
+  shouldUseDistinct(): boolean;
+  processSelect(): void;
+  getKnexQuery(): any;
+  execute<T>({ mapResults }?: { mapResults?: boolean }): Promise<T>;
+  stream<T>({ mapResults }?: { mapResults?: boolean }): T;
+}
+
+const createQueryBuilder = (
+  uid: string,
+  db: Database,
+  initialState: Partial<State> = {}
+): QueryBuilder => {
   const meta = db.metadata.get(uid);
   const { tableName } = meta;
 
-  const state = _.defaults(
+  const state: State = _.defaults(
     {
       type: 'select',
       select: [],
@@ -33,6 +111,8 @@ const createQueryBuilder = (uid, db, initialState = {}) => {
       increments: [],
       decrements: [],
       aliasCounter: 0,
+      filters: null,
+      search: null,
     },
     initialState
   );
@@ -130,7 +210,7 @@ const createQueryBuilder = (uid, db, initialState = {}) => {
       return this;
     },
 
-    max(column) {
+    max(column: string) {
       state.type = 'max';
       state.max = column;
 
@@ -511,4 +591,4 @@ const createQueryBuilder = (uid, db, initialState = {}) => {
   };
 };
 
-module.exports = createQueryBuilder;
+export default createQueryBuilder;

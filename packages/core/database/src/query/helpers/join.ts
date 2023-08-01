@@ -1,6 +1,35 @@
-'use strict';
+import type { Knex } from 'knex';
+import type { Ctx } from '../types';
 
-const createPivotJoin = (ctx, { alias, refAlias, joinTable, targetMeta }) => {
+interface Join {
+  method?: 'leftJoin' | 'innerJoin';
+  alias: string;
+  referencedTable: string;
+  referencedColumn: string;
+  rootColumn: string;
+  rootTable?: string;
+  on?: Record<string, any>;
+  orderBy?: Record<string, 'asc' | 'desc'>;
+}
+
+interface JoinOptions {
+  alias: string;
+  refAlias?: string;
+  attributeName: string;
+  attribute: any;
+}
+
+interface PivotJoinOptions {
+  alias: string;
+  refAlias?: string;
+  joinTable: any;
+  targetMeta: any;
+}
+
+const createPivotJoin = (
+  ctx: Ctx,
+  { alias, refAlias, joinTable, targetMeta }: PivotJoinOptions
+) => {
   const { qb } = ctx;
   const joinAlias = qb.getAlias();
   qb.join({
@@ -24,7 +53,7 @@ const createPivotJoin = (ctx, { alias, refAlias, joinTable, targetMeta }) => {
   return subAlias;
 };
 
-const createJoin = (ctx, { alias, refAlias, attributeName, attribute }) => {
+const createJoin = (ctx: Ctx, { alias, refAlias, attributeName, attribute }: JoinOptions) => {
   const { db, qb } = ctx;
 
   if (attribute.type !== 'relation') {
@@ -56,14 +85,15 @@ const createJoin = (ctx, { alias, refAlias, attributeName, attribute }) => {
 };
 
 // TODO: toColumnName for orderBy & on
-const applyJoin = (qb, join) => {
+const applyJoin = (qb: Knex.QueryBuilder, join: Join) => {
   const {
     method = 'leftJoin',
     alias,
     referencedTable,
     referencedColumn,
     rootColumn,
-    rootTable = qb.alias,
+    // FIXME: qb.alias can't exist here
+    rootTable, // = qb.alias
     on,
     orderBy,
   } = join;
@@ -86,11 +116,8 @@ const applyJoin = (qb, join) => {
   }
 };
 
-const applyJoins = (qb, joins) => joins.forEach((join) => applyJoin(qb, join));
-
-module.exports = {
-  createJoin,
-  createPivotJoin,
-  applyJoins,
-  applyJoin,
+const applyJoins = (qb: Knex.QueryBuilder, joins: Join[]) => {
+  return joins.forEach((join) => applyJoin(qb, join));
 };
+
+export { createJoin, createPivotJoin, applyJoins, applyJoin };

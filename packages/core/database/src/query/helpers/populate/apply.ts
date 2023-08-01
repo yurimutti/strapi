@@ -1,8 +1,6 @@
-'use strict';
+import _ from 'lodash/fp';
 
-const _ = require('lodash/fp');
-
-const { fromRow } = require('../transform');
+import { fromRow } from '../transform';
 
 /**
  * Populate oneToOne and manyToOne relation
@@ -661,4 +659,4 @@ const applyPopulate = async (results, populate, ctx) => {
   }
 };
 
-module.exports = applyPopulate;
+export default applyPopulate;

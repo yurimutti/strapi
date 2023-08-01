@@ -1,6 +1,4 @@
-'use strict';
-
-const { createLifecyclesProvider } = require('../lifecycles');
+import { createLifecyclesProvider } from '../lifecycles';
 
 describe('LifecycleProvider', () => {
   describe('run', () => {

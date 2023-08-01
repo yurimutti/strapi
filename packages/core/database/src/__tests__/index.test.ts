@@ -1,6 +1,4 @@
-'use strict';
-
-const { Database } = require('../index');
+import { Database } from '../index';
 
 jest.mock('../connection', () =>
   jest.fn(() => {

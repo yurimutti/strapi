@@ -1,26 +1,23 @@
-'use strict';
+import { randomBytes } from 'crypto';
+import { map, isEmpty } from 'lodash/fp';
+import type { Knex } from 'knex';
 
-const { randomBytes } = require('crypto');
-const { map, isEmpty } = require('lodash/fp');
-
-const {
+import {
   isBidirectional,
   isOneToAny,
   isManyToAny,
   isAnyToOne,
   hasOrderColumn,
   hasInverseOrderColumn,
-} = require('../metadata/relations');
-const { createQueryBuilder } = require('../query');
-const { addSchema } = require('../utils/knex');
+} from '../metadata/relations';
+import { createQueryBuilder } from '../query';
+import { addSchema } from '../utils/knex';
+import type { Database } from '..';
+import type { ID } from '../typings';
+import type { BidirectionalRelationalAttribute } from '../metadata/types';
 
 /**
  * If some relations currently exist for this oneToX relation, on the one side, this function removes them and update the inverse order if needed.
- * @param {Object} params
- * @param {string} params.id - entity id on which the relations for entities relIdsToadd are created
- * @param {string} params.attribute - attribute of the relation
- * @param {string} params.inverseRelIds - entity ids of the inverse side for which the current relations will be deleted
- * @param {string} params.db - database instance
  */
 const deletePreviousOneToAnyRelations = async ({
   id,
@@ -28,6 +25,12 @@ const deletePreviousOneToAnyRelations = async ({
   relIdsToadd,
   db,
   transaction: trx,
+}: {
+  id: string;
+  attribute: BidirectionalRelationalAttribute;
+  relIdsToadd: string[];
+  db: Database;
+  transaction: Knex.Transaction;
 }) => {
   if (!(isBidirectional(attribute) && isOneToAny(attribute))) {
     throw new Error(
@@ -52,11 +55,6 @@ const deletePreviousOneToAnyRelations = async ({
 
 /**
  * If a relation currently exists for this xToOne relations, this function removes it and update the inverse order if needed.
- * @param {Object} params
- * @param {string} params.id - entity id on which the relation for entity relIdToadd is created
- * @param {string} params.attribute - attribute of the relation
- * @param {string} params.relIdToadd - entity id of the new relation
- * @param {string} params.db - database instance
  */
 const deletePreviousAnyToOneRelations = async ({
   id,
@@ -64,6 +62,12 @@ const deletePreviousAnyToOneRelations = async ({
   relIdToadd,
   db,
   transaction: trx,
+}: {
+  id: ID;
+  attribute: BidirectionalRelationalAttribute;
+  relIdToadd: ID;
+  db: Database;
+  transaction: Knex.Transaction;
 }) => {
   const { joinTable } = attribute;
   const { joinColumn, inverseJoinColumn } = joinTable;
@@ -82,7 +86,7 @@ const deletePreviousAnyToOneRelations = async ({
       })
       .where(joinTable.on || {})
       .transacting(trx)
-      .execute();
+      .execute<{ [key: string]: ID }[]>();
 
     const relIdsToDelete = map(inverseJoinColumn.name, relsToDelete);
 
@@ -114,12 +118,6 @@ const deletePreviousAnyToOneRelations = async ({
 
 /**
  * Delete all or some relations of entity field
- * @param {Object} params
- * @param {string} params.id - entity id for which the relations will be deleted
- * @param {string} params.attribute - attribute of the relation
- * @param {string} params.db - database instance
- * @param {string} params.relIdsToDelete - ids of entities to remove from the relations. Also accepts 'all'
- * @param {string} params.relIdsToNotDelete - ids of entities to not remove from the relation when relIdsToDelete equals 'all'
  */
 const deleteRelations = async ({
   id,
@@ -128,17 +126,25 @@ const deleteRelations = async ({
   relIdsToNotDelete = [],
   relIdsToDelete = [],
   transaction: trx,
+}: {
+  id: ID;
+  attribute: BidirectionalRelationalAttribute;
+  db: Database;
+  relIdsToNotDelete?: ID[];
+  relIdsToDelete?: ID[] | 'all';
+  transaction: Knex.Transaction;
 }) => {
   const { joinTable } = attribute;
   const { joinColumn, inverseJoinColumn } = joinTable;
   const all = relIdsToDelete === 'all';
 
   if (hasOrderColumn(attribute) || hasInverseOrderColumn(attribute)) {
-    let lastId = 0;
+    let lastId: ID = 0;
     let done = false;
     const batchSize = 100;
+
     while (!done) {
-      const batchToDelete = await createQueryBuilder(joinTable.name, db)
+      const batchToDelete: { id: ID }[] = await createQueryBuilder(joinTable.name, db)
         .select(inverseJoinColumn.name)
         .where({
           [joinColumn.name]: id,
@@ -151,6 +157,7 @@ const deleteRelations = async ({
         .limit(batchSize)
         .transacting(trx)
         .execute();
+
       done = batchToDelete.length < batchSize;
       lastId = batchToDelete[batchToDelete.length - 1]?.id || 0;
 
@@ -184,13 +191,20 @@ const deleteRelations = async ({
 
 /**
  * Clean the order columns by ensuring the order value are continuous (ex: 1, 2, 3 and not 1, 5, 10)
- * @param {Object} params
- * @param {string} params.id - entity id for which the clean will be done
- * @param {string} params.attribute - attribute of the relation
- * @param {string} params.db - database instance
- * @param {string} params.inverseRelIds - entity ids of the inverse side for which the clean will be done
  */
-const cleanOrderColumns = async ({ id, attribute, db, inverseRelIds, transaction: trx }) => {
+const cleanOrderColumns = async ({
+  id,
+  attribute,
+  db,
+  inverseRelIds,
+  transaction: trx,
+}: {
+  id?: ID;
+  attribute: BidirectionalRelationalAttribute;
+  db: Database;
+  inverseRelIds: ID[];
+  transaction: Knex.Transaction;
+}) => {
   if (
     !(hasOrderColumn(attribute) && id) &&
     !(hasInverseOrderColumn(attribute) && !isEmpty(inverseRelIds))
@@ -220,7 +234,9 @@ const cleanOrderColumns = async ({ id, attribute, db, inverseRelIds, transaction
   WHERE b.id = a.id;
   */
   const updateOrderColumn = async () => {
-    if (!hasOrderColumn(attribute) || !id) return;
+    if (!hasOrderColumn(attribute) || !id) {
+      return;
+    }
 
     const select = db
       .connection(joinTable.name)
@@ -245,7 +261,7 @@ const cleanOrderColumns = async ({ id, attribute, db, inverseRelIds, transaction
         break;
 
       default: {
-        const joinTableName = addSchema(joinTable.name);
+        const joinTableName = addSchema(db, joinTable.name);
 
         // raw query as knex doesn't allow updating from a subquery
         await db.connection
@@ -274,7 +290,10 @@ const cleanOrderColumns = async ({ id, attribute, db, inverseRelIds, transaction
   WHERE b.id = a.id;
   */
   const updateInverseOrderColumn = async () => {
-    if (!hasInverseOrderColumn(attribute) || isEmpty(inverseRelIds)) return;
+    if (!hasInverseOrderColumn(attribute) || isEmpty(inverseRelIds)) {
+      return;
+    }
+
     const select = db
       .connection(joinTable.name)
       .select('id')
@@ -297,7 +316,7 @@ const cleanOrderColumns = async ({ id, attribute, db, inverseRelIds, transaction
         break;
 
       default: {
-        const joinTableName = addSchema(joinTable.name);
+        const joinTableName = addSchema(db, joinTable.name);
 
         // raw query as knex doesn't allow updating from a subquery
         await db.connection
@@ -326,6 +345,12 @@ const cleanOrderColumnsForOldDatabases = async ({
   db,
   inverseRelIds,
   transaction: trx,
+}: {
+  id?: ID;
+  attribute: BidirectionalRelationalAttribute;
+  db: Database;
+  inverseRelIds: ID[];
+  transaction: Knex.Transaction;
 }) => {
   const { joinTable } = attribute;
   const { joinColumn, inverseJoinColumn, orderColumnName, inverseOrderColumnName } = joinTable;
@@ -419,14 +444,16 @@ const cleanOrderColumnsForOldDatabases = async ({
  * This function would make such update, so all inverse order columns related
  * to the given id (1 in this example) are following a 1, 2, 3 sequence, without gap.
  *
- * @param {Object} params
- * @param {string} params.id - entity id to find which inverse order column to clean
- * @param {Object} params.attribute - attribute of the relation
- * @param {Object} params.trx - knex transaction
- *
  */
-
-const cleanInverseOrderColumn = async ({ id, attribute, trx }) => {
+const cleanInverseOrderColumn = async ({
+  id,
+  attribute,
+  trx,
+}: {
+  id: ID;
+  attribute: BidirectionalRelationalAttribute;
+  trx: Knex.Transaction;
+}) => {
   const con = strapi.db.connection;
   const { joinTable } = attribute;
   const { joinColumn, inverseJoinColumn, inverseOrderColumnName } = joinTable;
@@ -488,7 +515,7 @@ const cleanInverseOrderColumn = async ({ id, attribute, trx }) => {
   }
 };
 
-module.exports = {
+export {
   deletePreviousOneToAnyRelations,
   deletePreviousAnyToOneRelations,
   deleteRelations,

@@ -1,22 +1,22 @@
-'use strict';
+import _ from 'lodash/fp';
+import type { Knex } from 'knex';
 
-const _ = require('lodash/fp');
+import * as types from '../../types';
+import { createField } from '../../fields';
 
-const types = require('../../types');
-const { createField } = require('../../fields');
+import type { Meta } from '../../metadata/types';
 
-const fromRow = (meta, row) => {
-  if (Array.isArray(row)) {
-    return row.map((singleRow) => fromRow(meta, singleRow));
-  }
+type Row = Record<string, unknown>;
+type Rec = Record<string, unknown>;
 
+const fromSingleRow = (meta: Meta, row: Row): Rec | null => {
   const { attributes } = meta;
 
   if (_.isNil(row)) {
     return null;
   }
 
-  const obj = {};
+  const obj: Rec = {};
 
   for (const column in row) {
     if (!_.has(column, meta.columnToAttribute)) {
@@ -42,13 +42,17 @@ const fromRow = (meta, row) => {
   return obj;
 };
 
-const toRow = (meta, data = {}) => {
-  if (_.isNil(data)) {
-    return data;
+const fromRow = (meta: Meta, row: Row | Row[]) => {
+  if (Array.isArray(row)) {
+    return row.map((singleRow) => fromSingleRow(meta, singleRow));
   }
 
-  if (_.isArray(data)) {
-    return data.map((datum) => toRow(meta, datum));
+  return fromSingleRow(meta, row);
+};
+
+const toSingleRow = (meta: Meta, data: Rec = {}): Row => {
+  if (_.isNil(data)) {
+    return data;
   }
 
   const { attributes } = meta;
@@ -67,7 +71,19 @@ const toRow = (meta, data = {}) => {
   return data;
 };
 
-const toColumnName = (meta, name) => {
+const toRow = (meta: Meta, data: Rec = {}): Row | Row[] => {
+  if (_.isNil(data)) {
+    return data;
+  }
+
+  if (_.isArray(data)) {
+    return data.map((datum) => toSingleRow(meta, datum));
+  }
+
+  return toSingleRow(meta, data);
+};
+
+const toColumnName = (meta: Meta, name: string) => {
   const attribute = meta.attributes[name];
 
   if (!attribute) {
@@ -77,8 +93,4 @@ const toColumnName = (meta, name) => {
   return attribute.columnName || name;
 };
 
-module.exports = {
-  toRow,
-  fromRow,
-  toColumnName,
-};
+export { toRow, fromRow, toColumnName };

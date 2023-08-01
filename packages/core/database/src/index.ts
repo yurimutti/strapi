@@ -43,6 +43,10 @@ class Database {
 
   entityManager: any;
 
+  static transformContentTypes: typeof transformContentTypes;
+
+  static init: (config: DatabaseConfig) => Promise<Database>;
+
   constructor(config: DatabaseConfig) {
     this.metadata = createMetadata(config.models);
 
@@ -70,7 +74,7 @@ class Database {
     this.entityManager = createEntityManager(this);
   }
 
-  query(uid) {
+  query(uid: string) {
     if (!this.metadata.has(uid)) {
       throw new Error(`Model ${uid} not found`);
     }
@@ -125,7 +129,8 @@ class Database {
     return this.connection.client.connectionSettings.schema;
   }
 
-  getConnection(tableName?: string) {
+  getConnection(): Knex;
+  getConnection(tableName?: string): Knex | Knex.QueryBuilder {
     const schema = this.getSchemaName();
     const connection = tableName ? this.connection(tableName) : this.connection;
     return schema ? connection.withSchema(schema) : connection;
@@ -148,7 +153,7 @@ class Database {
 
 // TODO: move into strapi
 Database.transformContentTypes = transformContentTypes;
-Database.init = async (config) => {
+Database.init = async (config: DatabaseConfig) => {
   const db = new Database(config);
   await validateDatabase(db);
   return db;

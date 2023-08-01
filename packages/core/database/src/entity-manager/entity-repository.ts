@@ -1,10 +1,10 @@
 import { isString } from 'lodash/fp';
 import { isAnyToMany } from '../metadata/relations';
 import type { Database } from '..';
+import type { ID } from '../typings';
 
 type Params = Record<string, unknown>;
 type Data = Record<string, unknown>;
-type ID = number | string;
 
 const withDefaultPagination = (params: Params) => {
   const { page = 1, pageSize = 10, ...rest } = params;

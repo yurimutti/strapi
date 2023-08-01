@@ -1,8 +1,14 @@
-'use strict';
+import _, { castArray } from 'lodash/fp';
+import { InvalidRelationError } from '../errors';
+import type { ID } from '../typings';
 
-const { castArray } = require('lodash/fp');
-const _ = require('lodash/fp');
-const { InvalidRelationError } = require('../errors');
+interface Rel {
+  id: ID;
+  position: { before: ID } | { after: ID } | { start: true } | { end: true };
+  order?: number;
+  computed?: boolean;
+}
+
 /**
  * When connecting relations, the order you connect them matters.
  *
@@ -21,12 +27,15 @@ const { InvalidRelationError } = require('../errors');
  *   { id: 5, position: { before: 1 } }
  *
  */
-const sortConnectArray = (connectArr, initialArr = [], strictSort = true) => {
-  const sortedConnect = [];
+export const sortConnectArray = (connectArr: Rel[], initialArr: Rel[] = [], strictSort = true) => {
+  const sortedConnect: Rel[] = [];
   // Boolean to know if we have to recalculate the order of the relations
   let needsSorting = false;
   // Map to validate if relation is already in sortedConnect or DB.
-  const relationInInitialArray = initialArr.reduce((acc, rel) => ({ ...acc, [rel.id]: true }), {});
+  const relationInInitialArray = initialArr.reduce(
+    (acc, rel) => ({ ...acc, [rel.id]: true }),
+    {} as Record<ID, boolean>
+  );
   // Map to store the first index where a relation id is connected
   const mappedRelations = connectArr.reduce((mapper, relation) => {
     const adjacentRelId = relation.position?.before || relation.position?.after;
@@ -47,13 +56,15 @@ const sortConnectArray = (connectArr, initialArr = [], strictSort = true) => {
       [relation.id]: { ...relation, computed: false },
       ...mapper,
     };
-  }, {});
+  }, {} as Record<ID, Rel>);
 
   // If we don't need to sort the connect array, we can return it as is
-  if (!needsSorting) return connectArr;
+  if (!needsSorting) {
+    return connectArr;
+  }
 
   // Recursively compute in which order the relation should be connected
-  const computeRelation = (relation, relationsSeenInBranch) => {
+  const computeRelation = (relation: Rel, relationsSeenInBranch: Record<ID, Rel>) => {
     const adjacentRelId = relation.position?.before || relation.position?.after;
     const adjacentRelation = mappedRelations[adjacentRelId];
 
@@ -67,7 +78,9 @@ const sortConnectArray = (connectArr, initialArr = [], strictSort = true) => {
     }
 
     // This relation has already been computed
-    if (mappedRelations[relation.id]?.computed) return;
+    if (mappedRelations[relation.id]?.computed) {
+      return;
+    }
 
     mappedRelations[relation.id].computed = true;
 
@@ -79,7 +92,10 @@ const sortConnectArray = (connectArr, initialArr = [], strictSort = true) => {
 
     // Look if id is referenced elsewhere in the array
     if (mappedRelations[adjacentRelId]) {
-      computeRelation(adjacentRelation, { ...relationsSeenInBranch, [relation.id]: true });
+      computeRelation(adjacentRelation, {
+        ...relationsSeenInBranch,
+        [relation.id]: true,
+      });
       sortedConnect.push(relation);
     } else if (strictSort) {
       // If we reach this point, it means that the adjacent relation is not in the connect array
@@ -124,14 +140,13 @@ const sortConnectArray = (connectArr, initialArr = [], strictSort = true) => {
  * - The final step would be to recalculate fractional order values.
  *      [ { id: 2, order: 4 }, { id: 5, order: 3.33 },  { id: 4, order: 3.66 }, { id: 3, order: 10 } ]
  *
- * @param {Array<*>} initArr - array of relations to initialize the class with
- * @param {string} idColumn - the column name of the id
- * @param {string} orderColumn - the column name of the order
- * @param {boolean} strict - if true, will throw an error if a relation is connected adjacent to
- *                               another one that does not exist
- * @return {*}
  */
-const relationsOrderer = (initArr, idColumn, orderColumn, strict) => {
+export const relationsOrderer = (
+  initArr: Rel[],
+  idColumn: keyof Rel,
+  orderColumn: keyof Rel,
+  strict: boolean
+) => {
   const computedRelations = _.castArray(initArr || []).map((r) => ({
     init: true,
     id: r[idColumn],
@@ -140,32 +155,38 @@ const relationsOrderer = (initArr, idColumn, orderColumn, strict) => {
 
   const maxOrder = _.maxBy('order', computedRelations)?.order || 0;
 
-  const findRelation = (id) => {
+  const findRelation = (id: ID) => {
     const idx = computedRelations.findIndex((r) => r.id === id);
     return { idx, relation: computedRelations[idx] };
   };
 
-  const removeRelation = (r) => {
+  const removeRelation = (r: Rel) => {
     const { idx } = findRelation(r.id);
     if (idx >= 0) {
       computedRelations.splice(idx, 1);
     }
   };
 
-  const insertRelation = (r) => {
+  const insertRelation = (r: Rel) => {
     let idx;
 
-    if (r.position?.before) {
+    if ('before' in r.position && r.position.before) {
       const { idx: _idx, relation } = findRelation(r.position.before);
-      if (relation.init) r.order = relation.order - 0.5;
-      else r.order = relation.order;
+      if (relation.init) {
+        r.order = relation.order - 0.5;
+      } else {
+        r.order = relation.order;
+      }
       idx = _idx;
-    } else if (r.position?.after) {
+    } else if ('after' in r.position && r.position.after) {
       const { idx: _idx, relation } = findRelation(r.position.after);
-      if (relation.init) r.order = relation.order + 0.5;
-      else r.order = relation.order;
+      if (relation.init) {
+        r.order = relation.order + 0.5;
+      } else {
+        r.order = relation.order;
+      }
       idx = _idx + 1;
-    } else if (r.position?.start) {
+    } else if ('start' in r.position && r.position?.start) {
       r.order = 0.5;
       idx = 0;
     } else {
@@ -178,13 +199,13 @@ const relationsOrderer = (initArr, idColumn, orderColumn, strict) => {
   };
 
   return {
-    disconnect(relations) {
+    disconnect(relations: Rel | Rel[]) {
       castArray(relations).forEach((relation) => {
         removeRelation(relation);
       });
       return this;
     },
-    connect(relations) {
+    connect(relations: Rel | Rel[]) {
       sortConnectArray(castArray(relations), computedRelations, strict).forEach((relation) => {
         this.disconnect(relation);
 
@@ -221,5 +242,3 @@ const relationsOrderer = (initArr, idColumn, orderColumn, strict) => {
     },
   };
 };
-
-module.exports = { relationsOrderer, sortConnectArray };

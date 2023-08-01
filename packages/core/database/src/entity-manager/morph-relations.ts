@@ -1,9 +1,26 @@
-'use strict';
+import { groupBy, pipe, mapValues, map, isEmpty } from 'lodash/fp';
+import type { Knex } from 'knex';
 
-const { groupBy, pipe, mapValues, map, isEmpty } = require('lodash/fp');
-const { createQueryBuilder } = require('../query');
+import { createQueryBuilder } from '../query';
+import type { Database } from '..';
+import type { MorphJoinTable } from '../metadata/types';
 
-const getMorphToManyRowsLinkedToMorphOne = (rows, { uid, attributeName, typeColumn, db }) =>
+type Rows = { field: string; [key: string]: unknown }[];
+
+const getMorphToManyRowsLinkedToMorphOne = (
+  rows: Rows,
+  {
+    uid,
+    attributeName,
+    typeColumn,
+    db,
+  }: {
+    uid: string;
+    attributeName: string;
+    typeColumn: { name: string };
+    db: Database;
+  }
+) =>
   rows.filter((row) => {
     const relatedType = row[typeColumn.name];
     const field = row.field;
@@ -18,9 +35,21 @@ const getMorphToManyRowsLinkedToMorphOne = (rows, { uid, attributeName, typeColu
     );
   });
 
-const deleteRelatedMorphOneRelationsAfterMorphToManyUpdate = async (
-  rows,
-  { uid, attributeName, joinTable, db, transaction: trx }
+export const deleteRelatedMorphOneRelationsAfterMorphToManyUpdate = async (
+  rows: Rows,
+  {
+    uid,
+    attributeName,
+    joinTable,
+    db,
+    transaction: trx,
+  }: {
+    uid: string;
+    attributeName: string;
+    joinTable: MorphJoinTable;
+    db: Database;
+    transaction: Knex.Transaction;
+  }
 ) => {
   const { morphColumn } = joinTable;
   const { idColumn, typeColumn } = morphColumn;
@@ -56,8 +85,4 @@ const deleteRelatedMorphOneRelationsAfterMorphToManyUpdate = async (
       .transacting(trx)
       .execute();
   }
-};
-
-module.exports = {
-  deleteRelatedMorphOneRelationsAfterMorphToManyUpdate,
 };

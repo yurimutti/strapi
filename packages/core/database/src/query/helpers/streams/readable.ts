@@ -1,10 +1,8 @@
-'use strict';
+import { Readable } from 'stream';
+import { isFinite } from 'lodash/fp';
 
-const { Readable } = require('stream');
-const { isFinite } = require('lodash/fp');
-
-const { applyPopulate } = require('../populate');
-const { fromRow } = require('../transform');
+import { applyPopulate } from '../populate';
+import { fromRow } from '../transform';
 
 const knexQueryDone = Symbol('knexQueryDone');
 const knexPerformingQuery = Symbol('knexPerformingQuery');
@@ -171,4 +169,4 @@ class ReadableStrapiQuery extends Readable {
   }
 }
 
-module.exports = ReadableStrapiQuery;
+export default ReadableStrapiQuery;

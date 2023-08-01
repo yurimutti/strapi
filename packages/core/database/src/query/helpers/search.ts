@@ -1,11 +1,11 @@
-'use strict';
+import _ from 'lodash/fp';
+import type { Knex } from 'knex';
 
-const _ = require('lodash/fp');
+import * as types from '../../types';
+import { toColumnName } from './transform';
+import type { Ctx } from '../types';
 
-const types = require('../../types');
-const { toColumnName } = require('./transform');
-
-const applySearch = (knex, query, ctx) => {
+export const applySearch = (knex: Knex, query: string, ctx: Ctx) => {
   const { qb, uid, db } = ctx;
   const meta = db.metadata.get(uid);
 
@@ -67,7 +67,7 @@ const applySearch = (knex, query, ctx) => {
   }
 };
 
-const escapeQuery = (query, charsToEscape, escapeChar = '\\') => {
+const escapeQuery = (query: string, charsToEscape: string, escapeChar = '\\') => {
   return query
     .split('')
     .reduce(
@@ -77,8 +77,4 @@ const escapeQuery = (query, charsToEscape, escapeChar = '\\') => {
           : `${escapedQuery}${char}`,
       ''
     );
-};
-
-module.exports = {
-  applySearch,
 };
