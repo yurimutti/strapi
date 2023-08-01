@@ -165,7 +165,7 @@ export interface Database {
   metadata: any;
   connection: Knex;
 
-  query<T extends keyof AllTypes>(uid: T): QueryFromContentType<T>;
+  query: any
   transaction(
     cb?: (params: {
       trx: Knex.Transaction;
