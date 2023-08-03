@@ -17,7 +17,7 @@ import {
   CHARGEBEE_STAGES_PER_WORKFLOW_ENTITLEMENT_NAME,
   CHARGEBEE_WORKFLOW_ENTITLEMENT_NAME,
 } from '../../../../pages/SettingsPage/pages/ReviewWorkflows/constants';
-import { useReviewWorkflows } from '../../../../pages/SettingsPage/pages/ReviewWorkflows/hooks/useReviewWorkflows';
+import { useReviewWorkflowsStages } from '../../../../pages/SettingsPage/pages/ReviewWorkflows/hooks/useReviewWorkflowsStages';
 import { getStageColorByHex } from '../../../../pages/SettingsPage/pages/ReviewWorkflows/utils/colors';
 
 const ATTRIBUTE_NAME = 'strapi_stage';
@@ -26,7 +26,7 @@ export function InformationBoxEE() {
   const {
     initialData,
     isCreatingEntry,
-    layout: { uid, options },
+    layout: contentType,
     isSingleType,
     onChange,
   } = useCMEditViewDataManager();
@@ -35,18 +35,14 @@ export function InformationBoxEE() {
   // be updated at the same time when modifiedData is updated, otherwise
   // the entity is flagged as modified
   const activeWorkflowStage = initialData?.[ATTRIBUTE_NAME] ?? null;
-  const hasReviewWorkflowsEnabled = options?.reviewWorkflows ?? false;
+  const hasReviewWorkflowsEnabled = contentType.options?.reviewWorkflows ?? false;
   const { formatMessage } = useIntl();
   const { formatAPIError } = useAPIErrorHandler();
   const toggleNotification = useNotification();
   const { getFeature } = useLicenseLimits();
   const [showLimitModal, setShowLimitModal] = React.useState(false);
 
-  const {
-    meta,
-    workflows: [workflow],
-    isLoading: isWorkflowLoading,
-  } = useReviewWorkflows({ filters: { contentTypes: uid } });
+  const { meta, stages, isLoading: isWorkflowLoading } = useReviewWorkflowsStages(contentType);
 
   const { error, isLoading, mutateAsync } = useMutation(
     async ({ entityId, stageId, uid }) => {
@@ -109,15 +105,14 @@ export function InformationBoxEE() {
          */
       } else if (
         limits?.[CHARGEBEE_STAGES_PER_WORKFLOW_ENTITLEMENT_NAME] &&
-        parseInt(limits[CHARGEBEE_STAGES_PER_WORKFLOW_ENTITLEMENT_NAME], 10) <
-          workflow.stages.length
+        parseInt(limits[CHARGEBEE_STAGES_PER_WORKFLOW_ENTITLEMENT_NAME], 10) < stages.length
       ) {
         setShowLimitModal('stage');
       } else {
         await mutateAsync({
           entityId: initialData.id,
           stageId,
-          uid,
+          uid: contentType.uid,
         });
       }
     } catch (error) {
@@ -136,6 +131,7 @@ export function InformationBoxEE() {
 
       {hasReviewWorkflowsEnabled && !isCreatingEntry && (
         <SingleSelect
+          disabled={stages.length === 0}
           error={formattedError}
           name={ATTRIBUTE_NAME}
           id={ATTRIBUTE_NAME}
@@ -167,30 +163,28 @@ export function InformationBoxEE() {
             </Flex>
           )}
         >
-          {workflow
-            ? workflow.stages.map(({ id, color, name }) => {
-                const { themeColorName } = getStageColorByHex(color);
+          {stages.map(({ id, color, name }) => {
+            const { themeColorName } = getStageColorByHex(color);
 
-                return (
-                  <SingleSelectOption
-                    startIcon={
-                      <Flex
-                        height={2}
-                        background={color}
-                        borderColor={themeColorName === 'neutral0' ? 'neutral150' : 'transparent'}
-                        hasRadius
-                        shrink={0}
-                        width={2}
-                      />
-                    }
-                    value={id}
-                    textValue={name}
-                  >
-                    {name}
-                  </SingleSelectOption>
-                );
-              })
-            : []}
+            return (
+              <SingleSelectOption
+                startIcon={
+                  <Flex
+                    height={2}
+                    background={color}
+                    borderColor={themeColorName === 'neutral0' ? 'neutral150' : 'transparent'}
+                    hasRadius
+                    shrink={0}
+                    width={2}
+                  />
+                }
+                value={id}
+                textValue={name}
+              >
+                {name}
+              </SingleSelectOption>
+            );
+          })}
         </SingleSelect>
       )}
 
