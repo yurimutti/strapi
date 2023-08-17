@@ -1,42 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
 
-import { LoadingIndicatorPage } from '@strapi/helper-plugin';
+import { LoadingIndicatorPage, once } from '@strapi/helper-plugin';
 import PropTypes from 'prop-types';
 import { Route } from 'react-router-dom';
 
-const LazyCompo = ({ loadComponent }) => {
-  const [Compo, setCompo] = useState(null);
+const warnOnce = once(console.warn);
 
-  useEffect(() => {
-    const loadCompo = async () => {
+const LazyComponent = ({ loadComponent }) => {
+  const [Component, setComponent] = React.useState(null);
+
+  React.useEffect(() => {
+    async function load() {
       try {
         const loadedCompo = await loadComponent();
 
-        setCompo(() => loadedCompo.default);
+        setComponent(() => loadedCompo.default);
       } catch (err) {
-        // TODO return the error component
-        console.log(err);
+        // silence
       }
-    };
+    }
 
-    loadCompo();
+    load();
   }, [loadComponent]);
 
-  if (Compo) {
-    return <Compo />;
+  if (Component) {
+    return <Component />;
   }
 
   return <LoadingIndicatorPage />;
 };
 
-LazyCompo.propTypes = {
+LazyComponent.propTypes = {
   loadComponent: PropTypes.func.isRequired,
 };
 
+/**
+ *
+ * @deprecated
+ * @export
+ */
+
 export const createRoute = (Component, to, exact) => {
+  warnOnce('`createRoute` is deprecated and will be removed.');
+
   return (
     <Route
-      render={() => <LazyCompo loadComponent={Component} />}
+      render={() => <LazyComponent loadComponent={Component} />}
       key={to}
       path={to}
       exact={exact || false}

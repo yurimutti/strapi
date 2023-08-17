@@ -31,18 +31,42 @@ export function SettingsPage() {
     }
   );
 
-  /**
-   * `Component` is an async function, which is passed as property of the
-   * addSettingsLink() API during the plugin bootstrap step.
-   *
-   * Because of that we can't just render <Route component={Component} />,
-   * but have to await the function.
-   *
-   * This isn't a good React pattern and should be reconsidered.
-   */
-
   const pluginSettingsRoutes = Object.values(settings).flatMap((section) =>
-    section.links.map((link) => createRoute(link.Component, link.to, link.exact || false))
+    section.links.map(({ Component, to, exact }) => {
+      /**
+       * Async components are deprecated and will be removed in v5.
+       *
+       * `Component` is an async function, which is passed as property of the
+       * addSettingsLink() API during the plugin bootstrap step.
+       *
+       * Because of that we can't just render <Route component={Component} />,
+       * but have to await the function.
+       *
+       */
+
+      if (Component[Symbol.toStringTag] === 'AsyncFunction') {
+        return createRoute(Component, to, exact);
+      }
+
+      /**
+       *
+       * Component is a loadable from React.lazy.
+       *
+       * In v6 this will become:
+       *
+       * ```
+       *   <Route path="{to}" lazy={Component} />
+       * ```
+       *
+       * and we can remove the conversation to a loadable in StrapiApp.
+       */
+
+      return (
+        <Route key={to} path={to}>
+          <Component />
+        </Route>
+      );
+    })
   );
 
   // Since the useSettingsMenu hook can make API calls in order to check the links permissions

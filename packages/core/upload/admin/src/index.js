@@ -1,3 +1,5 @@
+import * as React from 'react';
+
 // NOTE TO PLUGINS DEVELOPERS:
 // If you modify this file by adding new options to the plugin entry point
 // Here's the file: strapi/docs/3.0.0-beta.x/plugin-development/frontend-field-api.md
@@ -8,8 +10,6 @@ import { prefixPluginTranslations } from '@strapi/helper-plugin';
 
 import pluginPkg from '../../package.json';
 
-import { MediaLibraryDialog } from './components/MediaLibraryDialog';
-import { MediaLibraryInput } from './components/MediaLibraryInput';
 import PluginIcon from './components/PluginIcon';
 import { PERMISSIONS } from './constants';
 import pluginId from './pluginId';
@@ -27,15 +27,27 @@ export default {
         defaultMessage: 'Media Library',
       },
       permissions: PERMISSIONS.main,
-      async Component() {
-        const component = await import(/* webpackChunkName: "upload" */ './pages/App');
-
-        return component;
-      },
+      Component: () => import(/* webpackChunkName: "upload" */ './pages/App'),
     });
 
-    app.addFields({ type: 'media', Component: MediaLibraryInput });
-    app.addComponents([{ name: 'media-library', Component: MediaLibraryDialog }]);
+    app.addFields({
+      type: 'media',
+      Component: React.lazy(() =>
+        import('./components/MediaLibraryInput').then((module) => ({
+          default: module.MediaLibraryInput,
+        }))
+      ),
+    });
+    app.addComponents([
+      {
+        name: 'media-library',
+        Component: React.lazy(() =>
+          import('./components/MediaLibraryDialog').then((module) => ({
+            default: module.MediaLibraryDialog,
+          }))
+        ),
+      },
+    ]);
 
     app.registerPlugin({
       id: pluginId,
@@ -50,13 +62,7 @@ export default {
         defaultMessage: 'Media Library',
       },
       to: '/settings/media-library',
-      async Component() {
-        const component = await import(
-          /* webpackChunkName: "upload-settings" */ './pages/SettingsPage'
-        );
-
-        return component;
-      },
+      Component: () => import(/* webpackChunkName: "upload-settings" */ './pages/SettingsPage'),
       permissions: PERMISSIONS.settings,
     });
   },

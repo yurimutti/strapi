@@ -78,18 +78,41 @@ export const Admin = () => {
 
   const routes = menu
     .filter((link) => link.Component)
+    .map(({ to, Component, exact }) => {
+      /**
+       * Async components are deprecated and will be removed in v5.
+       *
+       * `Component` is an async function, which is passed as property of the
+       * addMenuLink() API during the plugin registration step.
+       *
+       * Because of that we can't just render <Route component={Component} />,
+       * but have to await the function.
+       *
+       */
 
-    /**
-     * `Component` is an async function, which is passed as property of the
-     * addMenuLink() API during the plugin registration step.
-     *
-     * Because of that we can't just render <Route component={Component} />,
-     * but have to await the function.
-     *
-     * This isn't a good React pattern and should be reconsidered.
-     */
+      if (Component[Symbol.toStringTag] === 'AsyncFunction') {
+        return createRoute(Component, to, exact);
+      }
 
-    .map(({ to, Component, exact }) => createRoute(Component, to, exact));
+      /**
+       *
+       * Component is a loadable from React.lazy.
+       *
+       * In v6 this will become:
+       *
+       * ```
+       *   <Route path="{to}" lazy={Component} />
+       * ```
+       *
+       * and we can remove the conversation to a loadable in StrapiApp.
+       */
+
+      return (
+        <Route key={to} path={to}>
+          <Component />
+        </Route>
+      );
+    });
 
   if (isLoading) {
     return <LoadingIndicatorPage />;
