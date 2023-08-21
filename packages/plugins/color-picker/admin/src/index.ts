@@ -8,6 +8,7 @@ import { getTrad } from './utils/getTrad';
 // eslint-disable-next-line import/no-default-export
 export default {
   register(app: Strapi) {
+    console.log('register');
     app.customFields.register({
       name: 'color',
       pluginId: 'color-picker',
